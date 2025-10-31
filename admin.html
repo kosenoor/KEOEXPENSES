@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KEO Admin Panel</title>
+<style>
+  body {margin:0;font-family:Inter,system-ui,sans-serif;background:#07192b;color:#eaf6ff;padding:20px;}
+  h1,h2,h3{margin:0;}
+  .container{max-width:1200px;margin:auto;}
+  .card{background:#0f1724;padding:20px;border-radius:14px;margin-bottom:20px;box-shadow:0 6px 20px rgba(0,0,0,0.6);}
+  table{width:100%;border-collapse:collapse;margin-top:10px;}
+  th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.05);}
+  th{color:#9fb3c8;}
+  input,select,button{padding:8px 10px;border-radius:8px;border:none;font-size:14px;}
+  input,select{width:100%;margin-bottom:10px;background:#0a1a2b;color:#eaf6ff;}
+  button{cursor:pointer;background:linear-gradient(90deg,#00b7c2,#006ea6);color:#021;font-weight:600;}
+  button.danger{background:linear-gradient(90deg,#ff6b6b,#ff4d4d);}
+  .row{display:flex;gap:12px;flex-wrap:wrap;}
+  .row > div{flex:1;}
+  .actions button{margin-right:6px;}
+  /* Report styles */
+  #reportOutput table{border-collapse:collapse;width:100%;margin-top:15px;}
+  #reportOutput th,#reportOutput td{padding:8px;border:1px solid rgba(255,255,255,0.06);text-align:right;}
+  #reportOutput th{text-align:left;color:#9fb3c8;background:transparent;}
+  .report-subtotal{font-weight:600;background:#0d2233;color:#eaf6ff;}
+  .report-grand{font-weight:700;background:#003b3b;color:#eaf6ff;}
+  .details-table{margin:10px 0 20px 0;width:100%;border-collapse:collapse;background:transparent;}
+  .details-table th,.details-table td{border:1px solid rgba(255,255,255,0.04);padding:6px 8px;text-align:left;}
+  .toggle-btn{background:none;border:none;color:#00b7c2;font-weight:600;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>KEO Admin Panel</h1>
+
+<button id="closeAdminBtn" style="background:linear-gradient(90deg,#ff6b6b,#ff4d4d);color:#fff;font-weight:600;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;">
+      ✖ Close
+    </button>
+
+  <p style="color:#9fb3c8;">Manage users, locations, currencies, expense types and all expenses.</p>
+
+  <!-- Users Management -->
+  <div class="card">
+    <h2>Users Management</h2>
+    <div class="row">
+      <div><input type="text" id="newUsername" placeholder="Username"></div>
+      <div><input type="password" id="newPassword" placeholder="Password"></div>
+      <div>
+        <select id="newRole">
+          <option value="cashier">Cashier</option>
+          <option value="admin">Admin</option>
+          <option value="viewer">Viewer</option>
+        </select>
+      </div>
+      <div>
+        <select id="newUserLocation"><option value="">Select Location</option></select>
+      </div>
+      <div><button id="addUserBtn">Add User</button></div>
+    </div>
+    <table id="usersTable">
+      <thead><tr><th>Username</th><th>Role</th><th>Location</th><th>Actions</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Locations Management -->
+  <div class="card">
+    <h2>Locations</h2>
+    <div class="row">
+      <div><input type="text" id="newLocationName" placeholder="Location Name (e.g. Dubai)"></div>
+      <div>
+        <select id="newLocationCurrency"><option value="">Select Currency</option></select>
+      </div>
+      <div><button id="addLocationBtn">Add Location</button></div>
+    </div>
+    <table id="locationsTable">
+      <thead><tr><th>Location</th><th>Currency</th><th>Actions</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Currency Management -->
+  <div class="card">
+    <h2>Currencies</h2>
+    <div class="row">
+      <div><input type="text" id="newCurrencyCode" placeholder="Currency Code (e.g. AED)"></div>
+      <div><input type="text" id="newCurrencyName" placeholder="Currency Name (e.g. Dirham)"></div>
+      <div><button id="addCurrencyBtn">Add Currency</button></div>
+    </div>
+    <table id="currenciesTable">
+      <thead><tr><th>Code</th><th>Name</th><th>Actions</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Expense Types -->
+  <div class="card">
+    <h3>Expense Types</h3>
+    <form id="expenseTypeForm">
+      <div class="row">
+        <label>Type Name</label>
+        <input type="text" id="expenseTypeName" placeholder="e.g. Food, Travel" required />
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn">Add Type</button>
+      </div>
+    </form>
+    <table id="typeTable" style="width:100%; margin-top:10px;">
+      <thead><tr><th>Type Name</th><th>Action</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Expenses Overview -->
+  <div class="card">
+    <h3>All Expenses Overview</h3>
+    <table id="expensesTable">
+      <thead>
+        <tr><th>Date</th><th>Type</th><th>Name</th><th>Amount</th><th>By</th><th>Remarks</th><th>Actions</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- === Consolidated Finance Report (added) === -->
+  <div class="card">
+    <h2>Consolidated Finance Report</h2>
+    <div class="row">
+      <div>
+        <label>From Date</label>
+        <input type="date" id="reportStart">
+      </div>
+      <div>
+        <label>To Date</label>
+        <input type="date" id="reportEnd">
+      </div>
+      <div style="display:flex;align-items:end;">
+        <button id="generateReportBtn">Generate Consolidated Finance Report</button>
+      </div>
+      <div style="display:flex;align-items:end;">
+        <button id="exportExcelBtn">Export Excel</button>
+      </div>
+      <div style="display:flex;align-items:end;">
+        <button id="exportPdfBtn">Export PDF</button>
+      </div>
+    </div>
+    <div id="reportOutput"></div>
+  </div>
+  <!-- === End Report Card === -->
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+import { getDatabase, ref, push, set, get, remove, update } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD7THSopCQg_tLPSr1tmwyasvB2yokl0p8",
+  authDomain: "keoexpenses.firebaseapp.com",
+  databaseURL: "https://keoexpenses-default-rtdb.firebaseio.com",
+  projectId: "keoexpenses",
+  storageBucket: "keoexpenses.firebasestorage.app",
+  messagingSenderId: "225484106443",
+  appId: "1:225484106443:web:9425f8a3f170210f0f094e",
+  measurementId: "G-JMVD3LD6G5"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// References
+const usersRef = ref(db, "users");
+const locationsRef = ref(db, "locations");
+const currenciesRef = ref(db, "currencies");
+const typesRef = ref(db, "expenseTypes");
+const expensesRef = ref(db, "expenses");
+
+// ==================== CURRENCIES ==================== //
+const addCurrencyBtn = document.getElementById("addCurrencyBtn");
+const currenciesTableBody = document.querySelector("#currenciesTable tbody");
+
+async function loadCurrencies() {
+  const snapshot = await get(currenciesRef);
+  currenciesTableBody.innerHTML = "";
+  document.getElementById("newLocationCurrency").innerHTML = '<option value="">Select Currency</option>';
+  if (snapshot.exists()) {
+    const data = snapshot.val();
+    Object.entries(data).forEach(([id, c]) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${c.code}</td>
+        <td>${c.name}</td>
+        <td>
+          <button onclick="editCurrency('${id}','${c.code}','${c.name}')">Edit</button>
+          <button class="danger" onclick="deleteCurrency('${id}')">Delete</button>
+        </td>`;
+      currenciesTableBody.appendChild(tr);
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = `${c.code} - ${c.name}`;
+      document.getElementById("newLocationCurrency").appendChild(opt);
+    });
+  }
+}
+
+addCurrencyBtn.addEventListener("click", async () => {
+  const code = document.getElementById("newCurrencyCode").value.trim();
+  const name = document.getElementById("newCurrencyName").value.trim();
+  if (!code || !name) return alert("Enter both currency code and name!");
+  await set(push(currenciesRef), { code, name });
+  document.getElementById("newCurrencyCode").value = "";
+  document.getElementById("newCurrencyName").value = "";
+  loadCurrencies();
+});
+
+window.editCurrency = async (id, code, name) => {
+  const newCode = prompt("Edit Code", code);
+  const newName = prompt("Edit Name", name);
+  if (newCode && newName) {
+    await update(ref(db, "currencies/" + id), { code: newCode, name: newName });
+    loadCurrencies();
+  }
+};
+
+window.deleteCurrency = async (id) => {
+  if (confirm("Delete currency?")) {
+    await remove(ref(db, "currencies/" + id));
+    loadCurrencies();
+  }
+};
+
+// ==================== LOCATIONS ==================== //
+const addLocationBtn = document.getElementById("addLocationBtn");
+const locationsTableBody = document.querySelector("#locationsTable tbody");
+
+async function loadLocations() {
+  const snapshot = await get(locationsRef);
+  locationsTableBody.innerHTML = "";
+  document.getElementById("newUserLocation").innerHTML = '<option value="">Select Location</option>';
+  if (snapshot.exists()) {
+    const data = snapshot.val();
+    Object.entries(data).forEach(([id, l]) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${l.name}</td>
+        <td>${l.currencyName || ""}</td>
+        <td>
+          <button onclick="editLocation('${id}','${l.name}','${l.currencyId || ""}')">Edit</button>
+          <button class="danger" onclick="deleteLocation('${id}')">Delete</button>
+        </td>`;
+      locationsTableBody.appendChild(tr);
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = l.name;
+      document.getElementById("newUserLocation").appendChild(opt);
+    });
+  }
+}
+
+addLocationBtn.addEventListener("click", async () => {
+  const name = document.getElementById("newLocationName").value.trim();
+  const currencyId = document.getElementById("newLocationCurrency").value;
+  if (!name || !currencyId) return alert("Enter name and select currency!");
+  const curSnap = await get(ref(db, "currencies/" + currencyId));
+  const currencyName = curSnap.exists() ? curSnap.val().code : "";
+  await set(push(locationsRef), { name, currencyId, currencyName });
+  document.getElementById("newLocationName").value = "";
+  loadLocations();
+});
+
+window.editLocation = async (id, name, currencyId) => {
+  const newName = prompt("Edit Location Name", name);
+  if (newName) {
+    await update(ref(db, "locations/" + id), { name: newName });
+    loadLocations();
+  }
+};
+
+window.deleteLocation = async (id) => {
+  if (confirm("Delete location?")) {
+    await remove(ref(db, "locations/" + id));
+    loadLocations();
+  }
+};
+
+// ==================== USERS ==================== //
+const addUserBtn = document.getElementById("addUserBtn");
+const usersTableBody = document.querySelector("#usersTable tbody");
+
+async function loadUsers() {
+  const snapshot = await get(usersRef);
+  usersTableBody.innerHTML = "";
+  if (snapshot.exists()) {
+    const data = snapshot.val();
+    Object.entries(data).forEach(([id, u]) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${u.username}</td>
+        <td>${u.role}</td>
+        <td>${u.locationName || ""}</td>
+        <td>
+          <button onclick="editUser('${id}','${u.username}','${u.role}','${u.locationId || ""}')">Edit</button>
+          <button class="danger" onclick="deleteUser('${id}')">Delete</button>
+        </td>`;
+      usersTableBody.appendChild(tr);
+    });
+  }
+}
+
+addUserBtn.addEventListener("click", async () => {
+  const username = document.getElementById("newUsername").value.trim();
+  const password = document.getElementById("newPassword").value.trim();
+  const role = document.getElementById("newRole").value;
+  const locationId = document.getElementById("newUserLocation").value;
+  if (!username || !password) return alert("Username & Password required!");
+  let locationName = "";
+  if (locationId) {
+    const locSnap = await get(ref(db, "locations/" + locationId));
+    if (locSnap.exists()) locationName = locSnap.val().name;
+  }
+  await set(push(usersRef), { username, password, role, locationId, locationName });
+  document.getElementById("newUsername").value = "";
+  document.getElementById("newPassword").value = "";
+  loadUsers();
+});
+
+window.editUser = async (id, username, role, locationId) => {
+  const newName = prompt("Edit Username", username);
+  const newRole = prompt("Edit Role", role);
+  if (newName && newRole) {
+    await update(ref(db, "users/" + id), { username: newName, role: newRole });
+    loadUsers();
+  }
+};
+
+window.deleteUser = async (id) => {
+  if (confirm("Delete user?")) {
+    await remove(ref(db, "users/" + id));
+    loadUsers();
+  }
+};
+
+// ==================== EXPENSE TYPES ==================== //
+const expenseTypeForm = document.getElementById("expenseTypeForm");
+const typeName = document.getElementById("expenseTypeName");
+const typeTableBody = document.querySelector("#typeTable tbody");
+
+async function loadTypes() {
+  const snapshot = await get(typesRef);
+  typeTableBody.innerHTML = "";
+  if (snapshot.exists()) {
+    const data = snapshot.val();
+    Object.entries(data).forEach(([id, t]) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${t.name}</td>
+        <td>
+          <button onclick="editType('${id}','${t.name}')">Edit</button>
+          <button class="danger" onclick="deleteType('${id}')">Delete</button>
+        </td>`;
+      typeTableBody.appendChild(row);
+    });
+  }
+}
+
+expenseTypeForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = typeName.value.trim();
+  if (!name) return alert("Enter a type name");
+  await set(push(typesRef), { name });
+  typeName.value = "";
+  loadTypes();
+});
+
+window.editType = async (id, name) => {
+  const newName = prompt("Edit Type", name);
+  if (newName) {
+    await update(ref(db, "expenseTypes/" + id), { name: newName });
+    loadTypes();
+  }
+};
+
+window.deleteType = async (id) => {
+  if (confirm("Delete this type?")) {
+    await remove(ref(db, "expenseTypes/" + id));
+    loadTypes();
+  }
+};
+
+// ==================== EXPENSES OVERVIEW ==================== //
+const expensesTableBody = document.querySelector("#expensesTable tbody");
+
+async function loadExpenses() {
+  const snapshot = await get(expensesRef);
+  expensesTableBody.innerHTML = "";
+  if (snapshot.exists()) {
+    const data = snapshot.val();
+    Object.entries(data).forEach(([id, e]) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${e.date}</td>
+        <td>${e.type}</td>
+        <td>${e.name}</td>
+        <td>${Number(e.amount || 0).toFixed(2)}</td>
+        <td>${e.spendBy || ""}</td>
+        <td>${e.remarks || ""}</td>
+        <td>
+          <button onclick="editExpense('${id}')">Edit</button>
+          <button class="danger" onclick="deleteExpense('${id}')">Delete</button>
+        </td>`;
+      expensesTableBody.appendChild(tr);
+    });
+  }
+}
+
+window.editExpense = async (id) => {
+  const snapshot = await get(ref(db, "expenses/" + id));
+  if (!snapshot.exists()) return;
+  const e = snapshot.val();
+  const newAmount = prompt("Edit Amount", e.amount);
+  if (newAmount) {
+    await update(ref(db, "expenses/" + id), { amount: Number(newAmount) });
+    loadExpenses();
+  }
+};
+
+window.deleteExpense = async (id) => {
+  if (confirm("Delete expense?")) {
+    await remove(ref(db, "expenses/" + id));
+    loadExpenses();
+  }
+};
+
+// Initial Load
+loadCurrencies();
+loadLocations();
+loadUsers();
+loadTypes();
+loadExpenses();
+
+// ==================== CLOSE BUTTON ==================== //
+const closeAdminBtn = document.getElementById("closeAdminBtn");
+closeAdminBtn.addEventListener("click", () => {
+  window.location.href = "index.html";
+});
+
+// ==================== Consolidated Report Logic (added) ==================== //
+const generateBtn = document.getElementById("generateReportBtn");
+const reportDiv = document.getElementById("reportOutput");
+let latestReportHtml = ""; // store for export if needed
+
+generateBtn.addEventListener("click", async () => {
+  const start = document.getElementById("reportStart").value;
+  const end = document.getElementById("reportEnd").value;
+  if (!start || !end) return alert("Please select both start and end dates.");
+
+  // Load all expenses
+  const expSnap = await get(expensesRef);
+  if (!expSnap.exists()) return alert("No expense data found!");
+  const expenses = expSnap.val();
+
+  // Load all locations (to resolve location names & currencies)
+  const locSnap = await get(locationsRef);
+  const allLocations = locSnap.exists() ? locSnap.val() : {};
+
+  // Grouping: location -> currency -> { debit, credit, transactions[] }
+  const byLocation = {};
+
+  for (const [id, e] of Object.entries(expenses)) {
+    const eDate = new Date(e.date);
+    if (isNaN(eDate)) continue;
+
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    startDate.setHours(0,0,0,0);
+    endDate.setHours(23,59,59,999);
+    if (eDate < startDate || eDate > endDate) continue;
+
+    // Resolve location and currency
+    const locData = allLocations[e.locationId] || { name: "Unknown", currencyName: "N/A" };
+    const loc = locData.name;
+    const currency = e.currencyCode || locData.currencyName || "N/A";
+
+    const amount = Number(e.amount || 0);
+    const type = e.type || "";
+    const isCredit = ["Income", "Opening Balance", "Bank Deposit","Donations"].includes(type);
+
+    if (!byLocation[loc]) byLocation[loc] = {};
+    if (!byLocation[loc][currency]) byLocation[loc][currency] = { debit:0, credit:0, transactions:[] };
+
+    if (isCredit) byLocation[loc][currency].credit += amount;
+    else byLocation[loc][currency].debit += amount;
+
+    byLocation[loc][currency].transactions.push({
+      id,
+      date: e.date || "",
+      type: e.type || "",
+      name: e.name || "",
+      amount,
+      isCredit,
+      spendBy: e.spendBy || "",
+      remarks: e.remarks || ""
+    });
+  }
+
+  // Build HTML report
+  let html = `<h3>Consolidated Finance Report (${start} to ${end})</h3>`;
+  html += `<table id="consolidatedReportTable"><thead><tr><th style="text-align:left">Location / Currency</th><th>Debit</th><th>Credit</th><th>Balance</th><th></th></tr></thead><tbody>`;
+
+  const currencyGrandTotals = {};
+  let rowIndex = 0;
+
+  const sortedLocations = Object.keys(byLocation).sort();
+  sortedLocations.forEach(loc => {
+    const currencies = byLocation[loc];
+    const sortedCurrencies = Object.keys(currencies).sort();
+
+    const locKey = `loc_${rowIndex++}`;
+    sortedCurrencies.forEach((cur, cIdx) => {
+      const data = currencies[cur];
+      const balance = data.credit - data.debit;
+
+      if (!currencyGrandTotals[cur]) currencyGrandTotals[cur] = { debit:0, credit:0 };
+      currencyGrandTotals[cur].debit += data.debit;
+      currencyGrandTotals[cur].credit += data.credit;
+
+      const rowId = `r_${locKey}_${cIdx}`;
+      html += `<tr class="report-subtotal">
+                <td style="text-align:left">${loc} — ${cur}</td>
+                <td>${data.debit.toFixed(2)}</td>
+                <td>${data.credit.toFixed(2)}</td>
+                <td>${balance.toFixed(2)}</td>
+                <td><button class="toggle-btn" data-target="${rowId}">▶ Show Details</button></td>
+              </tr>`;
+      
+      html += `<tr id="${rowId}" style="display:none;"><td colspan="5">
+                <table class="details-table">
+                  <thead><tr>
+                    <th>Date</th><th>Type</th><th>Name</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th>By</th><th>Remarks</th>
+                  </tr></thead>
+                  <tbody>`;
+      data.transactions.forEach(t => {
+        html += `<tr>
+                  <td>${t.date}</td>
+                  <td>${t.type}</td>
+                  <td>${t.name}</td>
+                  <td style="text-align:right">${t.isCredit ? "" : t.amount.toFixed(2)}</td>
+                  <td style="text-align:right">${t.isCredit ? t.amount.toFixed(2) : ""}</td>
+                  <td>${t.spendBy}</td>
+                  <td>${t.remarks}</td>
+                </tr>`;
+      });
+      html += `</tbody></table></td></tr>`;
+    });
+  });
+
+  // Grand totals by currency
+  html += `<tr><th colspan="5" style="text-align:left">Grand Totals by Currency</th></tr>`;
+  Object.entries(currencyGrandTotals).forEach(([cur, t]) => {
+    const bal = t.credit - t.debit;
+    html += `<tr class="report-grand">
+              <td style="text-align:left">${cur}</td>
+              <td>${t.debit.toFixed(2)}</td>
+              <td>${t.credit.toFixed(2)}</td>
+              <td>${bal.toFixed(2)}</td>
+              <td></td>
+            </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  reportDiv.innerHTML = html;
+  latestReportHtml = html;
+
+  // Toggle buttons
+  document.querySelectorAll(".toggle-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const targetRow = document.getElementById(btn.dataset.target);
+      if (!targetRow) return;
+      const isShown = targetRow.style.display !== "none";
+      targetRow.style.display = isShown ? "none" : "table-row";
+      btn.textContent = isShown ? "▶ Show Details" : "▼ Hide Details";
+    });
+  });
+});
+
+
+// ==================== EXPORTS ==================== //
+document.getElementById("exportExcelBtn").addEventListener("click", ()=>{
+  const table = document.getElementById("consolidatedReportTable");
+  if (!table) return alert("Please generate the report first.");
+  // Ensure xlsx lib loaded
+  if (typeof XLSX === "undefined") {
+    alert("Excel export library not yet loaded. Please try again in a moment.");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, {sheet: "Consolidated Report"});
+  XLSX.writeFile(wb, `Consolidated_Finance_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
+});
+
+document.getElementById("exportPdfBtn").addEventListener("click", ()=>{
+  if (!latestReportHtml) return alert("Please generate the report first.");
+  const win = window.open("", "_blank");
+  // Basic printable styling to preserve table layout
+  const printStyle = `<style>
+    body{font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff;padding:20px;}
+    table{border-collapse:collapse;width:100%;}
+    th,td{border:1px solid #333;padding:6px;text-align:right;}
+    th{text-align:left;}
+    .details-table th,.details-table td{text-align:left;}
+  </style>`;
+  win.document.write(`<html><head><title>Consolidated Finance Report</title>${printStyle}</head><body>${latestReportHtml}</body></html>`);
+  win.document.close();
+  win.print();
+});
+
+// Load xlsx library dynamically (for Excel export)
+const script = document.createElement("script");
+script.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+script.onload = () => console.log("XLSX library loaded for Excel export.");
+document.body.appendChild(script);
+
+</script>
+</body>
+</html>
