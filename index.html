@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>KEO Expenses — Daily Ledger</title>
+
+<!-- Styles -->
+<style>
+:root{
+  --dark-blue:#0b1e33;--heading-blue:#0c2a48;--accent:#00b7c2;
+  --card:#152233;--muted:#a1b0c0;--glass: rgba(255,255,255,0.03);--radius:14px;
+  --input-bg:#1f2a3a;--input-color:#eaf6ff;
+}
+html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;}
+body{
+  background: linear-gradient(135deg,#0b1e33,#0c2a48);
+  color:#eaf6ff; padding:20px; box-sizing:border-box;
+}
+.container{max-width:1200px;margin:12px auto;padding:20px;border-radius:20px;background: linear-gradient(135deg, rgba(3,37,65,0.2), rgba(0,58,92,0.15)); box-shadow: 0 6px 30px rgba(2,10,20,0.7);}
+header{display:flex;align-items:center;gap:14px;padding:18px;border-radius:12px;background: linear-gradient(90deg,var(--heading-blue), #0a3a5a);box-shadow: 0 6px 20px rgba(0,0,0,0.7);}
+.logo{width:60px;height:60px;border-radius:12px;background:linear-gradient(135deg,#00b7c2,#0077b6);display:flex;align-items:center;justify-content:center;font-weight:700;color:#021;box-shadow:0 6px 18px rgba(0,0,0,0.4);}
+header h1{margin:0;font-size:22px;letter-spacing:0.2px;}
+header p{margin:0;font-size:12px;color:var(--muted);}
+.layout{display:grid;grid-template-columns:1fr 450px;gap:18px;margin-top:18px;}
+@media (max-width:980px){ .layout{grid-template-columns:1fr;} }
+.card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:16px;border-radius:var(--radius);box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);}
+form .row{display:flex;flex-direction:column;margin-bottom:12px;}
+form label{font-size:13px;color:var(--muted);margin-bottom:6px;}
+input, select, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);background:var(--input-bg);color:var(--input-color);box-sizing:border-box;font-size:14px;}
+textarea{min-height:60px;resize:vertical;}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:10px;border:0;background:linear-gradient(90deg,#00b7c2,#006ea6);color:#021;cursor:pointer;font-weight:600;}
+.btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);}
+.btn.danger{background:linear-gradient(90deg,#ff6b6b,#ff4d4d);color:#fff;}
+.right-column{display:flex;flex-direction:column;gap:12px;}
+.small{font-size:13px;color:var(--muted);}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px;}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.03);}
+thead th{font-size:13px;color:var(--muted);font-weight:600;}
+tbody tr:hover{background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));}
+.sum-bar{margin-top:10px;padding:10px;border-radius:10px;background:rgba(255,255,255,0.02);display:flex;justify-content:space-between;align-items:center;}
+.sum-value{font-size:18px;font-weight:700;color:#aef7ff;}
+.tiny{font-size:12px;padding:6px 8px;border-radius:8px;}
+.muted{color:var(--muted);font-size:13px;}
+.type-pill{padding:6px 10px;border-radius:8px;font-size:13px;color:#021;font-weight:600;}
+.type-credit{background:#0a503c;}
+.type-debit{background:#8b1c1c;}
+.actions{display:flex;gap:8px;flex-wrap:wrap;}
+.modal {position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:999;display:none;}
+.modal-content {background:#152233;padding:20px;border-radius:14px;max-width:650px;width:100%;box-shadow:0 6px 20px rgba(0,0,0,0.6);overflow:auto;max-height:80vh;}
+.modal h2{margin-top:0;color:#aef7ff;}
+.modal input, .modal select{margin-bottom:10px;}
+.locations-list{max-height:200px;overflow:auto;border-radius:8px;padding:8px;background:rgba(255,255,255,0.01);margin-bottom:8px;}
+.small-muted{font-size:12px;color:var(--muted);}
+.header-controls{margin-left:auto;text-align:right}
+.currency-badge{background:rgba(255,255,255,0.03);padding:4px 8px;border-radius:8px;font-weight:700;color:var(--muted);margin-left:8px;}
+</style>
+
+<!-- Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- Firebase unified import -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+import { getDatabase, ref, push, set, get, child, update, remove } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD7THSopCQg_tLPSr1tmwyasvB2yokl0p8",
+  authDomain: "keoexpenses.firebaseapp.com",
+  databaseURL: "https://keoexpenses-default-rtdb.firebaseio.com",
+  projectId: "keoexpenses",
+  storageBucket: "keoexpenses.firebasestorage.app",
+  messagingSenderId: "225484106443",
+  appId: "1:225484106443:web:9425f8a3f170210f0f094e",
+  measurementId: "G-JMVD3LD6G5"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const expensesRef = ref(db,'expenses');
+const usersRef = ref(db,'users');
+const typesRef = ref(db,'expenseTypes');
+const locationsRef = ref(db,'locations');
+
+const loginModal = document.getElementById('loginModal');
+const loginBtnHeader = document.getElementById('loginBtnHeader');
+const loginModalBtn = document.getElementById('loginModalBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const adminBtn = document.getElementById('adminBtn');
+const loginUser = document.getElementById('loginUser');
+const loginPass = document.getElementById('loginPass');
+const loginLocation = document.getElementById('loginLocation');
+const userInfo = document.getElementById('userInfo');
+const saveBtn = document.getElementById('saveBtn');
+const expenseForm = document.getElementById('expenseForm');
+const dateEl = document.getElementById('date');
+const typeEl = document.getElementById('type');
+const nameEl = document.getElementById('name');
+const amountEl = document.getElementById('amount');
+const remarksEl = document.getElementById('remarks');
+const spendByEl = document.getElementById('spendby');
+const tableBody = document.getElementById('tableBody');
+const filterFrom = document.getElementById('filterFrom');
+const filterTo = document.getElementById('filterTo');
+const filterType = document.getElementById('filterType');
+const applyFilters = document.getElementById('applyFilters');
+const clearFilters = document.getElementById('clearFilters');
+const balanceEl = document.getElementById('balance');
+const exportExcelBtn = document.getElementById('exportExcel');
+const exportPdfBtn = document.getElementById('exportPdf');
+const exportMailBtn = document.getElementById('exportMail');
+
+const adminModal = document.getElementById('adminModal');
+const closeAdminBtn = document.getElementById('closeAdminBtn');
+const addLocationForm = document.getElementById('addLocationForm');
+const locationsList = document.getElementById('locationsList');
+const addUserForm = document.getElementById('addUserForm');
+const userLocationSelect = document.getElementById('userLocationSelect');
+const adminUserList = document.getElementById('adminUserList');
+
+let currentUser=null;
+let allExpenses=[];
+let allLocations = {};
+
+// Utility: which types are credits
+function isCreditTransaction(type) {
+  const creditTypes = [
+    "Income",
+    "Opening Balance",
+    "Bank Deposit",
+    "Transfer Receipt from NRE",
+    "Cash Deposit",
+    "Donation Received",
+    "Refund Received"
+  ];
+  return creditTypes.includes(type);
+}
+
+function formatDateISO(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`;}
+dateEl.value=formatDateISO(new Date());
+
+window.addEventListener('load', async ()=>{
+  await loadLocations();
+  loginModal.style.display='flex';
+});
+
+loginBtnHeader.addEventListener('click',()=> loginModal.style.display='flex');
+
+loginModalBtn.addEventListener('click', async () => {
+  const u = loginUser.value.trim(), p = loginPass.value.trim();
+  const selectedLocationId = loginLocation.value;
+  if (!u || !p) return alert('Enter username/password');
+  if (!selectedLocationId) return alert('Select location');
+
+  const snapshot = await get(usersRef);
+  const users = snapshot.exists()?snapshot.val():{};
+  let matchedKey = null;
+  let matchedRecord = null;
+  for (const k in users){
+    const rec = users[k];
+    if (rec.username===u && rec.password===p){ matchedKey=k; matchedRecord=rec; break; }
+  }
+  if(!matchedRecord){ alert('User not found'); return; }
+
+  const allowed = (() => {
+    if (!selectedLocationId) return false;
+    if (matchedRecord.locationId && matchedRecord.locationId === selectedLocationId) return true;
+    if (matchedRecord.allowedLocations){
+      if (Array.isArray(matchedRecord.allowedLocations)) return matchedRecord.allowedLocations.includes(selectedLocationId);
+      if (typeof matchedRecord.allowedLocations === 'object') return !!matchedRecord.allowedLocations[selectedLocationId];
+    }
+    return false;
+  })();
+
+  if (!allowed){ alert('You do not have permission to access this location.'); return; }
+
+  const loc = allLocations[selectedLocationId];
+  if(!loc){ alert('Selected location not found (contact admin).'); return; }
+
+  currentUser = {
+    key: matchedKey,
+    username: u,
+    role: matchedRecord.role,
+    locationId: selectedLocationId,
+    location: loc
+  };
+
+  userInfo.innerHTML = `Logged in: ${u} (${matchedRecord.role}) <span class="currency-badge">${loc.currencySymbol||loc.currencyCode||''}</span>`;
+  loginModal.style.display='none';
+  loginBtnHeader.style.display='none';
+  logoutBtn.style.display='inline-block';
+  adminBtn.style.display=(matchedRecord.role==='admin')?'inline-block':'none';
+  saveBtn.disabled = (matchedRecord.role==='viewer');
+  await fetchExpenses();
+});
+
+adminBtn.addEventListener('click', () => {
+  if (currentUser?.role === 'admin') window.location.href = 'admin.html';
+  else alert('Admin only');
+});
+
+logoutBtn.addEventListener('click',()=>{
+  currentUser=null;
+  userInfo.textContent='Not logged in';
+  loginBtnHeader.style.display='inline-block';
+  logoutBtn.style.display='none';
+  adminBtn.style.display='none';
+  saveBtn.disabled=false;
+  tableBody.innerHTML=''; balanceEl.textContent='0.00';
+  loginModal.style.display='flex';
+});
+
+async function fetchExpenses(){
+  const snap = await get(expensesRef);
+  const raw = snap.exists()?snap.val():{};
+  const arr = [];
+  for (const k in raw){ const e = raw[k]; e._id = k; arr.push(e); }
+  if (currentUser && currentUser.locationId) allExpenses = arr.filter(e => (e.locationId === currentUser.locationId));
+  else allExpenses = [];
+  populateFilters(); populateTable(); updateSummary();
+}
+
+function populateFilters(){
+  const types=[...new Set(allExpenses.map(e=>e.type))].sort();
+  filterType.innerHTML='<option value="">— all —</option>';
+  types.forEach(t=>filterType.innerHTML+=`<option value="${t}">${t}</option>`);
+}
+
+async function loadExpenseTypes(){
+  const snap=await get(typesRef);
+  typeEl.innerHTML='<option value="">— choose —</option>';
+  const creditTypes=["Opening Balance","Bank Withdrawal","Income","Donations","Transfer Receipt from NRE"];
+  creditTypes.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=`${t} (Credit)`; typeEl.appendChild(o); });
+  if(snap.exists()){ const data=snap.val(); Object.values(data).forEach(t=>{ const o=document.createElement('option'); o.value=t.name; o.textContent=`${t.name} (Debit)`; typeEl.appendChild(o); }); }
+  filterType.innerHTML='<option value="">— all —</option>';
+  Array.from(typeEl.options).forEach(o=>{ if(o.value){ const f=document.createElement('option'); f.value=o.value; f.textContent=o.textContent; filterType.appendChild(f); } });
+}
+loadExpenseTypes();
+
+function populateTable(){
+  const f=allExpenses.filter(e=>{
+    let ok=true; if(filterFrom.value) ok=ok && e.date>=filterFrom.value;
+    if(filterTo.value) ok=ok && e.date<=filterTo.value;
+    if(filterType.value) ok=ok && e.type===filterType.value;
+    return ok;
+  });
+  tableBody.innerHTML='';
+  f.forEach(e=>{
+    const isCredit=["Income","Opening Balance","Bank Withdrawal","Donations","Transfer Receipt from NRE"].includes(e.type);
+    const currencySymbol = e.currencySymbol || (allLocations[e.locationId] && allLocations[e.locationId].currencySymbol) || '';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${e.date}</td>
+    <td><span class="type-pill ${isCredit?'type-credit':'type-debit'}">${e.type}</span> — ${e.name}</td>
+    <td>${isCredit?'':(currencySymbol + ' ' + Number(e.amount).toFixed(2))}</td>
+    <td>${isCredit?(currencySymbol + ' ' + Number(e.amount).toFixed(2)):''}</td>
+    <td>${e.spendBy||''}</td><td>${e.remarks||''}</td>
+    <td>${(currentUser.role==='admin'||currentUser.role==='cashier')?`<button class="btn tiny danger" onclick="deleteExpense('${e._id}')">Delete</button>`:''}</td>`;
+    tableBody.appendChild(tr);
+  });
+}
+
+function updateSummary(){
+  const f=allExpenses.filter(e=>{
+    let ok=true; if(filterFrom.value) ok=ok && e.date>=filterFrom.value;
+    if(filterTo.value) ok=ok && e.date<=filterTo.value;
+    if(filterType.value) ok=ok && e.type===filterType.value;
+    return ok;
+  });
+  const debit=f.filter(e=>!["Income","Opening Balance","Bank Withdrawal","Donations","Transfer Receipt from NRE"].includes(e.type)).reduce((a,b)=>a+Number(b.amount),0);
+  const credit=f.filter(e=>["Income","Opening Balance","Bank Withdrawal","Donations","Transfer Receipt from NRE"].includes(e.type)).reduce((a,b)=>a+Number(b.amount),0);
+  const bal = (credit-debit).toFixed(2);
+  const currencySymbol = (currentUser && currentUser.location && currentUser.location.currencySymbol) ? currentUser.location.currencySymbol : '';
+  balanceEl.textContent = currencySymbol + ' ' + bal;
+}
+
+// Helper: compute balances for all locations from DB (returns object mapping locationId -> balance)
+async function computeBalancesSnapshot(){
+  const snap = await get(expensesRef);
+  const raw = snap.exists()?snap.val():{};
+  const balances = {};
+  for (const k in raw){
+    const it = raw[k];
+    const loc = it.locationId;
+    if (!balances[loc]) balances[loc] = 0;
+    const amt = Number(it.amount) || 0;
+    if (isCreditTransaction(it.type)) balances[loc] += amt;
+    else balances[loc] -= amt;
+  }
+  return balances;
+}
+
+expenseForm.addEventListener('submit',async e=>{
+  e.preventDefault();
+  if(!currentUser) return alert('Login first.');
+
+  // Build primary entry
+  const amtNum = Number(amountEl.value);
+  if (isNaN(amtNum) || amtNum <= 0) return alert('Enter valid amount.');
+  const data = {
+    date:dateEl.value,
+    type:typeEl.value,
+    name:nameEl.value,
+    amount:amtNum.toFixed(2),
+    spendBy:spendByEl.value,
+    remarks:remarksEl.value,
+    locationId: currentUser.locationId,
+    currencySymbol: currentUser.location.currencySymbol || '',
+    currencyCode: currentUser.location.currencyCode || ''
+  };
+
+  // Build list of entries to write (primary + any mirrors)
+  const entriesToWrite = [];
+  entriesToWrite.push(Object.assign({}, data)); // primary
+
+  // Determine mirrors (Bank Transfer NRE to NRO => create Transfer Receipt in NRO; Bank Withdrawal => Cash Withdrawal in NRO)
+  if (data.type === "Bank Transfer NRE to NRO") {
+    const nroKey = Object.keys(allLocations).find(k=>{
+      const ln = (allLocations[k].name||'').toString().toLowerCase();
+      return ln === 'nro' || ln.includes('nro ');
+    });
+    if (nroKey) {
+      const nroLoc = allLocations[nroKey];
+      const transferEntry = {
+        date: data.date,
+        type: "Transfer Receipt from NRE",
+        name: data.name,
+        amount: data.amount,
+        spendBy: data.spendBy,
+        remarks: data.remarks,
+        locationId: nroKey,
+        currencySymbol: nroLoc.currencySymbol || data.currencySymbol || '',
+        currencyCode: nroLoc.currencyCode || data.currencyCode || ''
+      };
+      entriesToWrite.push(transferEntry);
+    }
+  }
+
+  if (data.type === "Bank Withdrawal") {
+    const nroKey = Object.keys(allLocations).find(k=>{
+      const ln = (allLocations[k].name||'').toString().toLowerCase();
+      return ln === 'nro' || ln.includes(' nro') || ln.includes('nro ') || ln.includes('nro');
+    });
+    if (nroKey) {
+      const nroLoc = allLocations[nroKey];
+      const cashEntry = {
+        date: data.date,
+        type: "Cash Withdrawal",
+        name: data.name,
+        amount: data.amount,
+        spendBy: data.spendBy,
+        remarks: data.remarks,
+        locationId: nroKey,
+        currencySymbol: nroLoc.currencySymbol || data.currencySymbol || '',
+        currencyCode: nroLoc.currencyCode || data.currencyCode || ''
+      };
+      entriesToWrite.push(cashEntry);
+    }
+  }
+
+  // Get current balances for all locations once
+  const currentBalances = await computeBalancesSnapshot();
+
+  // Simulate applying entries and check negative per location
+  const simulated = Object.assign({}, currentBalances); // shallow copy
+  for (const ent of entriesToWrite){
+    const loc = ent.locationId;
+    if (!simulated[loc]) simulated[loc] = 0;
+    const amt = Number(ent.amount) || 0;
+    if (isCreditTransaction(ent.type)) simulated[loc] += amt;
+    else simulated[loc] -= amt;
+    if (simulated[loc] < 0){
+      // Find display name for location if available
+      const locName = (allLocations[loc] && allLocations[loc].name) ? allLocations[loc].name : loc;
+      return alert(`Cannot save: transaction would make balance negative at location "${locName}".`);
+    }
+  }
+
+  // All checks passed — write entries to DB (capture keys so UI can show delete immediately)
+  try {
+    for (const ent of entriesToWrite){
+      const newRef = push(expensesRef);
+      await set(newRef, ent);
+      // attach _id to the entry object for UI
+      ent._id = newRef.key;
+      // If saved entry belongs to current user's location, add to allExpenses so UI updates immediately
+      if (ent.locationId === currentUser.locationId) allExpenses.push(ent);
+    }
+
+    // refresh filters/UI
+    populateFilters(); populateTable(); updateSummary();
+    expenseForm.reset(); dateEl.value=formatDateISO(new Date());
+  } catch (err) {
+    console.error('Failed to save entries:', err);
+    alert('Failed to save. See console for details.');
+  }
+});
+
+applyFilters.addEventListener('click',()=>{populateTable();updateSummary();});
+clearFilters.addEventListener('click',()=>{filterFrom.value='';filterTo.value='';filterType.value='';populateTable();updateSummary();});
+window.quickRange=function(days){const t=new Date();const f=new Date(t);f.setDate(t.getDate()-days+1);filterFrom.value=formatDateISO(f);filterTo.value=formatDateISO(t);populateTable();updateSummary();};
+
+exportExcelBtn.addEventListener('click',()=>{
+  const wb=XLSX.utils.book_new();
+  const wsData=[['Date','Type','Name','Debit','Credit','By','Remarks','Currency']];
+  allExpenses.forEach(e=>{
+    const c=["Income","Opening Balance","Bank Withdrawal","Donations","Transfer Receipt from NRE"].includes(e.type);
+    const cs = e.currencySymbol || (allLocations[e.locationId] && allLocations[e.locationId].currencySymbol) || '';
+    wsData.push([e.date,e.type,e.name,c? '': e.amount, c? e.amount : '', e.spendBy||'',e.remarks||'', cs + (e.currencyCode?(' ('+e.currencyCode+')'):'') ]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(wsData);
+  XLSX.utils.book_append_sheet(wb,ws,'Ledger');
+  XLSX.writeFile(wb,'Ledger.xlsx');
+});
+
+exportPdfBtn.addEventListener('click',()=>{
+  const { jsPDF } = window.jspdf; const doc=new jsPDF(); let y=10;
+  doc.setFontSize(12); doc.text('KEO Expenses Ledger',10,y); y+=8;
+  allExpenses.forEach(e=>{
+    const c=["Income","Opening Balance","Bank Withdrawal","Donations","Transfer Receipt from NRE"].includes(e.type);
+    const cs = e.currencySymbol || (allLocations[e.locationId] && allLocations[e.locationId].currencySymbol) || '';
+    doc.text(`${e.date} | ${e.type} | ${e.name} | D:${c?'':cs+e.amount} | C:${c?cs+e.amount:''} | ${e.spendBy||''} | ${e.remarks||''}`,10,y); y+=6;
+    if (y>270){ doc.addPage(); y=10; }
+  });
+  doc.save('Ledger.pdf');
+});
+
+exportMailBtn.addEventListener('click',()=>{
+  const s=encodeURIComponent('KEO Expenses Ledger');
+  const b=encodeURIComponent(allExpenses.map(e=>{
+    const c=["Income","Opening Balance","Bank Withdrawal","Donations","Transfer Receipt from NRE"].includes(e.type);
+    const cs = e.currencySymbol || (allLocations[e.locationId] && allLocations[e.locationId].currencySymbol) || '';
+    return `${e.date} | ${e.type} | ${e.name} | D:${c?'':cs+e.amount} | C:${c?cs+e.amount:''} | ${e.spendBy||''} | ${e.remarks||''}`;
+  }).join('\n'));
+  window.location.href=`mailto:?subject=${s}&body=${b}`;
+});
+
+async function loadLocations(){
+  const snap = await get(locationsRef);
+  const data = snap.exists()?snap.val():{};
+  allLocations = {};
+  for (const k in data){ allLocations[k] = Object.assign({ _id: k }, data[k]); }
+  loginLocation.innerHTML = '<option value="">— choose location —</option>';
+  Object.keys(allLocations).forEach(k=>{
+    const o = document.createElement('option');
+    o.value = k;
+    o.textContent = `${allLocations[k].name} (${allLocations[k].currencyCode || ''})`;
+    loginLocation.appendChild(o);
+  });
+  if (userLocationSelect){
+    userLocationSelect.innerHTML = '<option value="">— choose —</option>';
+    Object.keys(allLocations).forEach(k=>{
+      const o = document.createElement('option');
+      o.value = k;
+      o.textContent = `${allLocations[k].name} (${allLocations[k].currencySymbol||''} ${allLocations[k].currencyCode||''})`;
+      userLocationSelect.appendChild(o);
+    });
+  }
+}
+
+async function loadAdminData(){
+  await loadLocations();
+  locationsList.innerHTML = '';
+  Object.keys(allLocations).forEach(k=>{
+    const li = document.createElement('div');
+    li.className = 'small-muted';
+    li.innerHTML = `<strong>${allLocations[k].name}</strong> — ${allLocations[k].currencySymbol||''} ${allLocations[k].currencyCode||''}`;
+    locationsList.appendChild(li);
+  });
+  const snap = await get(usersRef);
+  const users = snap.exists()?snap.val():{};
+  adminUserList.innerHTML = '';
+  for (const k in users){
+    const u = users[k];
+    const allowed = u.allowedLocations ? (Array.isArray(u.allowedLocations) ? u.allowedLocations.join(',') : Object.keys(u.allowedLocations||{}).join(',')) : (u.locationId || '');
+    const div = document.createElement('div');
+    div.className = 'small-muted';
+    div.innerHTML = `<strong>${u.username}</strong> — role: ${u.role||'user'} — locations: ${allowed||'none'}`;
+    adminUserList.appendChild(div);
+  }
+}
+
+addLocationForm.addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const name = document.getElementById('locName').value.trim();
+  const symbol = document.getElementById('locSymbol').value.trim();
+  const code = document.getElementById('locCode').value.trim();
+  if(!name) return alert('Enter location name');
+  const data = { name, currencySymbol: symbol, currencyCode: code };
+  await set(push(locationsRef), data);
+  document.getElementById('locName').value=''; document.getElementById('locSymbol').value=''; document.getElementById('locCode').value='';
+  await loadAdminData();
+  await loadLocations();
+});
+
+addUserForm.addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const u = document.getElementById('newUsername').value.trim();
+  const p = document.getElementById('newPassword').value.trim();
+  const role = document.getElementById('newRole').value;
+  const loc = document.getElementById('userLocationSelect').value;
+  if(!u || !p) return alert('Enter username & password');
+  const userObj = { username: u, password: p, role: role || 'user' };
+  if (loc) { userObj.allowedLocations = {}; userObj.allowedLocations[loc] = true; }
+  await set(push(usersRef), userObj);
+  addUserForm.reset();
+  await loadAdminData();
+});
+
+closeAdminBtn.addEventListener('click', ()=> adminModal.style.display='none');
+window.addEventListener('click', (ev)=>{
+  if(ev.target === loginModal) loginModal.style.display='none';
+  if(ev.target === adminModal) adminModal.style.display='none';
+});
+
+
+// Delete function with mirror deletion and proper matching (numeric compare)
+window.deleteExpense = async function(id) {
+  if (!currentUser || !['admin', 'cashier'].includes(currentUser.role)) {
+    return alert('Not authorized.');
+  }
+
+  if (!confirm('Delete this entry?')) return;
+
+  // Get the record before deleting (so we know what to mirror-delete)
+  const expenseRef = ref(db, 'expenses/' + id);
+  const snapshot = await get(expenseRef);
+  if (!snapshot.exists()) return;
+
+  const data = snapshot.val();
+
+  // Delete the main entry
+  await remove(expenseRef);
+
+  // Mirror delete logic
+  if (data.type === "Bank Transfer NRE to NRO") {
+    await deleteMatchingEntry("Transfer Receipt from NRE", data);
+  } else if (data.type === "Transfer Receipt from NRE") {
+    await deleteMatchingEntry("Bank Transfer NRE to NRO", data);
+  } else if (data.type === "Bank Withdrawal") {
+    await deleteMatchingEntry("Cash Withdrawal", data);
+  } else if (data.type === "Cash Withdrawal") {
+    await deleteMatchingEntry("Bank Withdrawal", data);
+  }
+
+  // Update UI
+  allExpenses = allExpenses.filter(e => e._id !== id);
+  populateTable();
+  updateSummary();
+};
+
+// Helper function to remove the opposite entry
+async function deleteMatchingEntry(oppositeType, data) {
+  const expensesSnap = await get(expensesRef);
+  if (!expensesSnap.exists()) return;
+  const all = expensesSnap.val();
+
+  // Find matching opposite record (compare numeric amount)
+  const matchKey = Object.keys(all).find(key => {
+    const item = all[key];
+    return (
+      item.type === oppositeType &&
+      Number(item.amount) === Number(data.amount) &&
+      item.date === data.date &&
+      (item.spendBy || '') === (data.spendBy || '') &&
+      (item.name || '') === (data.name || '') &&
+      (item.remarks || '') === (data.remarks || '')
+    );
+  });
+
+  // Delete if found
+  if (matchKey) {
+    await remove(ref(db, 'expenses/' + matchKey));
+    allExpenses = allExpenses.filter(e => e._id !== matchKey);
+  }
+}
+
+</script>
+</head>
+
+<body>
+<div class="container">
+  <header>
+    <div class="logo">KEO</div>
+    <div><h1>KEO — Daily Expense Ledger</h1><p class="muted">Track spending, double-entry ledger, export easily</p></div>
+    <div class="header-controls">
+      <div class="muted" id="userInfo">Not logged in</div>
+      <div style="margin-top:6px">
+        <button class="btn tiny" id="loginBtnHeader">Login</button>
+        <button class="btn tiny" id="logoutBtn" style="display:none">Logout</button>
+        <button class="btn tiny" id="adminBtn" style="display:none">Admin</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div>
+      <div class="card">
+        <h3>Add entry (Debit/Credit)</h3>
+        <form id="expenseForm">
+          <div class="row"><label>Date</label><input type="date" id="date" required></div>
+          <div class="row"><label>Type</label><select id="type" required><option value="">— choose —</option></select></div>
+          <div class="row"><label>Name</label><input type="text" id="name" placeholder="Description" required></div>
+          <div class="row"><label>Amount</label><input type="number" id="amount" min="0" step="0.01" required></div>
+          <div class="row"><label>By</label><input type="text" id="spendby" placeholder="Person or source"></div>
+          <div class="row"><label>Remarks</label><input type="text" id="remarks" placeholder="Optional note"></div>
+          <div class="actions" style="margin-top:8px;"><button type="submit" class="btn" id="saveBtn">Save</button></div>
+        </form>
+      </div>
+
+      <div class="card" style="margin-top:14px;overflow:auto;max-height:420px;">
+        <table>
+          <thead><tr><th>Date</th><th>Type / Name</th><th>Debit</th><th>Credit</th><th>By</th><th>Remarks</th><th>Action</th></tr></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+        <div class="sum-bar">Balance: <span id="balance">0.00</span></div>
+      </div>
+    </div>
+
+    <aside class="right-column">
+      <div class="card">
+        <h4>Filters</h4>
+        <div class="row"><label>From</label><input type="date" id="filterFrom"></div>
+        <div class="row"><label>To</label><input type="date" id="filterTo"></div>
+        <div class="row"><label>Type</label><select id="filterType"><option value="">— all —</option></select></div>
+        <div class="actions">
+          <button class="btn tiny" id="applyFilters">Apply</button>
+          <button class="btn secondary tiny" id="clearFilters">Clear</button>
+        </div>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn tiny" onclick="quickRange(7)">Last 7 Days</button>
+          <button class="btn tiny" onclick="quickRange(30)">Last 30 Days</button>
+          <button class="btn tiny" onclick="quickRange(90)">Last 90 Days</button>
+        </div>
+      </div>
+
+      <div class="card actions">
+        <button class="btn tiny" id="exportExcel">Export Excel</button>
+        <button class="btn tiny" id="exportPdf">Export PDF</button>
+        <button class="btn tiny" id="exportMail">Email</button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="modal" id="loginModal">
+  <div class="modal-content">
+    <h2>Login</h2>
+    <div><label>Username</label><input type="text" id="loginUser"></div>
+    <div><label>Password</label><input type="password" id="loginPass"></div>
+    <div><label>Location</label>
+      <select id="loginLocation"><option value="">— choose location —</option></select>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn" id="loginModalBtn">Login</button>
+      <button class="btn secondary" onclick="loginModal.style.display='none'">Close</button>
+    </div>
+    <p class="small-muted" style="margin-top:8px">If you don't see your location, ask an admin to add it.</p>
+  </div>
+</div>
+
+<div class="modal" id="adminModal">
+  <div class="modal-content">
+    <h2>Admin Panel — Locations & Users</h2>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:260px;">
+        <h4>Add Location</h4>
+        <form id="addLocationForm">
+          <div class="row"><label>Location name</label><input id="locName" required></div>
+          <div class="row"><label>Currency symbol (e.g. ₹, $, د.إ)</label><input id="locSymbol"></div>
+          <div class="row"><label>Currency code (e.g. INR, USD, AED)</label><input id="locCode"></div>
+          <div class="actions"><button class="btn" type="submit">Add Location</button></div>
+        </form>
+
+        <h4 style="margin-top:14px">Existing Locations</h4>
+        <div id="locationsList" class="locations-list"></div>
+      </div>
+
+      <div style="flex:1;min-width:260px;">
+        <h4>Create User</h4>
+        <form id="addUserForm">
+          <div class="row"><label>Username</label><input id="newUsername" required></div>
+          <div class="row"><label>Password</label><input id="newPassword" required></div>
+          <div class="row"><label>Role</label>
+            <select id="newRole"><option value="user">User</option><option value="admin">Admin</option><option value="viewer">Viewer</option><option value="cashier">Cashier</option></select>
+          </div>
+          <div class="row"><label>Assign Location</label>
+            <select id="userLocationSelect"><option value="">— choose —</option></select>
+            <div class="small-muted">Assigning a location will add it to the user's allowedLocations.</div>
+          </div>
+          <div class="actions"><button class="btn" type="submit">Create User</button></div>
+        </form>
+
+        <h4 style="margin-top:14px">Existing Users</h4>
+        <div id="adminUserList" class="locations-list"></div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;text-align:right">
+      <button class="btn secondary" id="closeAdminBtn">Close</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
